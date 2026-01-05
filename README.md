@@ -4,15 +4,17 @@ An LLM-powered simulation inspired by Axelrod's cultural dissemination model. Ag
 
 ## How It Works
 
-- **Grid of agents**: Each agent holds a belief (sampled from a predefined set)
+- **Network of agents**: Each agent holds a belief (sampled from a predefined set)
+- **Multiple layouts**: Grid (4 or 8 neighbors), ring, mesh (fully connected), star
 - **Random interactions**: Each iteration, a random agent and neighbor are selected
 - **Persuader vs Defender**: 50/50 chance determines who tries to convince whom
 - **LLM conversations**: Using Ollama + Gemma3, agents debate their beliefs
 - **Belief updates**: The defender decides whether to update their belief based on the conversation
+- **Live visualization**: Network topology GUI shows agents color-coded by belief, highlighting active conversations
 
 Unlike traditional Axelrod (which copies traits deterministically), beliefs here *evolve* through actual argumentation - agents synthesize, refine, and sometimes resist change entirely.
 
-![Conversation GUI](images/screenshot_conversation21.png)
+![Simulation GUI](images/screenshot_belief_network_chat.png)
 
 ## Requirements
 
@@ -60,11 +62,14 @@ python replay_chat.py logs/simulation_20260103_010320.log 21 0.5  # faster repla
 Edit `simulation.py` to adjust:
 
 ```python
-GRID_SIZE = 3              # 3x3 grid = 9 agents
+N_AGENTS = 9               # number of agents
 CONVERSATION_ROUNDS = 5    # exchanges per interaction
 SIMULATION_ITERATIONS = 40 # total interactions
 MODEL = "gemma3"           # Ollama model
-RANDOM_SEED = 42           # for reproducible starting grids (None = random)
+RANDOM_SEED = 42           # for reproducible runs (None = random)
+
+# Layout options: Grid4Layout, Grid8Layout, RingLayout, MeshLayout, StarLayout
+layout = RingLayout(N_AGENTS)
 ```
 
 ## Observations

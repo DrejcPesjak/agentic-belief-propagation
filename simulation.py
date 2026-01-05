@@ -11,6 +11,7 @@ import ollama
 from chat_gui import run_conversation_with_gui
 from simulation_logger import SimulationLogger
 from grid_layouts import Layout, Grid4Layout, Grid8Layout, RingLayout, MeshLayout, StarLayout
+from network_gui import NetworkVisualizer
 
 
 # === Configuration ===
@@ -237,6 +238,9 @@ def run_simulation():
     print_layout_grid(layout, beliefs)
     logger.log_starting_grid_from_layout(layout)
     
+    # Initialize network visualization
+    network_viz = NetworkVisualizer(layout, beliefs, title="Belief Propagation Network")
+    
     # Track changes
     belief_changes = 0
     
@@ -268,6 +272,9 @@ def run_simulation():
         print(f"  Belief: {persuader_belief[:50]}...")
         print(f"Agent {defender_id} (defender) @ {defender_pos}")
         print(f"  Belief: {defender_belief[:50]}...")
+        
+        # Update network visualization to highlight active pair
+        network_viz.set_active_conversation(persuader_id, defender_id, iteration, SIMULATION_ITERATIONS)
         
         # Log iteration start
         logger.log_iteration_start(
@@ -318,6 +325,9 @@ def run_simulation():
         # Update belief in layout
         layout.set_belief(defender_id, new_belief)
         
+        # Update network visualization to show new belief colors
+        network_viz.update_beliefs()
+        
         if change_type == "changed":
             belief_changes += 1
             print(">>> BELIEF UPDATED!")
@@ -335,6 +345,9 @@ def run_simulation():
     print(f"Total iterations: {SIMULATION_ITERATIONS}")
     print(f"Belief changes detected: {belief_changes}")
     
+    # Update network visualization to show completion
+    network_viz.set_complete(SIMULATION_ITERATIONS, belief_changes)
+    
     # Print full final beliefs
     print_layout_beliefs(layout, "Final Grid Beliefs")
     print_layout_grid(layout, beliefs)
@@ -345,6 +358,17 @@ def run_simulation():
     logger.close()
     
     print(f"\nFull log saved to: {logger.get_path()}")
+    
+    # Keep network visualization open until user closes it
+    print("\nNetwork visualization window open. Close it to exit.")
+    try:
+        while network_viz.is_open():
+            network_viz.update()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        if network_viz.is_open():
+            network_viz.close()
 
 
 if __name__ == "__main__":
