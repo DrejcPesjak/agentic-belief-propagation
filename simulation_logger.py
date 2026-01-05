@@ -62,7 +62,7 @@ class SimulationLogger:
         self.log_file.flush()
         
     def log_starting_grid(self, grid: list[list[str]], size: int):
-        """Log starting grid state."""
+        """Log starting grid state (legacy 2D grid format)."""
         self.log_file.write("STARTING GRID BELIEFS\n")
         self.log_file.write("-" * 40 + "\n")
         for row in range(size):
@@ -71,6 +71,19 @@ class SimulationLogger:
                 belief = grid[row][col]
                 self.log_file.write(f"Agent {agent_id} @ ({row},{col}):\n")
                 self.log_file.write(f"  {belief}\n\n")
+        self.log_file.write("\n")
+        self.log_file.flush()
+    
+    def log_starting_grid_from_layout(self, layout):
+        """Log starting grid state from a Layout object."""
+        self.log_file.write("STARTING GRID BELIEFS\n")
+        self.log_file.write("-" * 40 + "\n")
+        self.log_file.write(f"Layout: {layout.__class__.__name__}\n\n")
+        for agent_id in range(layout.get_agent_count()):
+            pos_label = layout.get_position_label(agent_id)
+            belief = layout.get_belief(agent_id)
+            self.log_file.write(f"Agent {agent_id} @ {pos_label}:\n")
+            self.log_file.write(f"  {belief}\n\n")
         self.log_file.write("\n")
         self.log_file.flush()
         
@@ -112,7 +125,7 @@ class SimulationLogger:
         self.log_file.flush()
         
     def log_final_grid(self, grid: list[list[str]], size: int):
-        """Log final grid state."""
+        """Log final grid state (legacy 2D grid format)."""
         self.log_file.write("=" * 80 + "\n")
         self.log_file.write("FINAL GRID BELIEFS\n")
         self.log_file.write("=" * 80 + "\n\n")
@@ -122,6 +135,19 @@ class SimulationLogger:
                 belief = grid[row][col]
                 self.log_file.write(f"Agent {agent_id} @ ({row},{col}):\n")
                 self.log_file.write(f"  {belief}\n\n")
+        self.log_file.flush()
+    
+    def log_final_grid_from_layout(self, layout):
+        """Log final grid state from a Layout object."""
+        self.log_file.write("=" * 80 + "\n")
+        self.log_file.write("FINAL GRID BELIEFS\n")
+        self.log_file.write("=" * 80 + "\n\n")
+        self.log_file.write(f"Layout: {layout.__class__.__name__}\n\n")
+        for agent_id in range(layout.get_agent_count()):
+            pos_label = layout.get_position_label(agent_id)
+            belief = layout.get_belief(agent_id)
+            self.log_file.write(f"Agent {agent_id} @ {pos_label}:\n")
+            self.log_file.write(f"  {belief}\n\n")
         self.log_file.flush()
         
     def log_summary(self, total_iterations: int, belief_changes: int):

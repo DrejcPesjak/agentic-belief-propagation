@@ -10,12 +10,14 @@ import ollama
 
 from chat_gui import run_conversation_with_gui
 from simulation_logger import SimulationLogger
+from grid_layouts import Layout, Grid4Layout, Grid8Layout, RingLayout, MeshLayout, StarLayout
 
 
 # === Configuration ===
-GRID_SIZE = 3  # 3x3 grid = 9 agents
+# GRID_SIZE = 3  # 3x3 grid = 9 agents
+N_AGENTS = 9
 CONVERSATION_ROUNDS = 5  # 5 exchanges per interaction
-SIMULATION_ITERATIONS = 40  # total interactions to simulate
+SIMULATION_ITERATIONS = 5  # total interactions to simulate
 MODEL = "gemma3"
 BELIEFS_FILE = "money-philosophy.json"
 GUI_CLOSE_DELAY = 5.0  # seconds to show final decision before closing
@@ -27,38 +29,6 @@ def load_beliefs(filepath: str) -> list[str]:
     with open(filepath, "r") as f:
         data = json.load(f)
     return data["beliefs"]
-
-
-def initialize_grid(beliefs: list[str], size: int) -> list[list[str]]:
-    """Initialize MxM grid with randomly sampled beliefs (with repetition).
-    
-    Note: Random seed should be set before calling this function for reproducibility.
-    """
-    grid = []
-    for _ in range(size):
-        row = [random.choice(beliefs) for _ in range(size)]
-        grid.append(row)
-    return grid
-
-
-def get_neighbors(row: int, col: int, size: int) -> list[tuple[int, int]]:
-    """Get valid 4-connected neighbors (up, down, left, right) for a position."""
-    neighbors = []
-    for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-        nr, nc = row + dr, col + dc
-        if 0 <= nr < size and 0 <= nc < size:
-            neighbors.append((nr, nc))
-    return neighbors
-
-
-def pos_to_id(row: int, col: int, size: int) -> int:
-    """Convert grid position to agent ID."""
-    return row * size + col
-
-
-def id_to_pos(agent_id: int, size: int) -> tuple[int, int]:
-    """Convert agent ID to grid position."""
-    return agent_id // size, agent_id % size
 
 
 def build_system_prompt(belief: str, role: str) -> str:
@@ -172,31 +142,45 @@ def create_conversation_runner(
     return run_conversation
 
 
-def print_grid(grid: list[list[str]], beliefs: list[str], size: int) -> None:
-    """Print the grid showing belief indices for readability."""
-    print("\nCurrent Grid (belief indices):")
-    print("-" * (size * 4 + 1))
-    for row in grid:
-        row_display = []
-        for belief in row:
-            # Find index or show * for custom beliefs
+def print_layout_grid(layout: Layout, beliefs: list[str]) -> None:
+    """Print the grid showing belief indices for readability (for grid layouts)."""
+    # Check if this is a grid layout with .size attribute
+    if hasattr(layout, 'size'):
+        size = layout.size
+        print("\nCurrent Grid (belief indices):")
+        print("-" * (size * 4 + 1))
+        for row in range(size):
+            row_display = []
+            for col in range(size):
+                agent_id = row * size + col
+                belief = layout.get_belief(agent_id)
+                # Find index or show * for custom beliefs
+                try:
+                    idx = beliefs.index(belief)
+                    row_display.append(f" {idx} ")
+                except ValueError:
+                    row_display.append(" * ")  # Modified belief
+            print("|" + "|".join(row_display) + "|")
+            print("-" * (size * 4 + 1))
+    else:
+        # For non-grid layouts, just print agent beliefs in a list
+        print("\nCurrent Beliefs (indices):")
+        for agent_id in range(layout.get_agent_count()):
+            belief = layout.get_belief(agent_id)
             try:
                 idx = beliefs.index(belief)
-                row_display.append(f" {idx} ")
+                print(f"  Agent {agent_id}: [{idx}]")
             except ValueError:
-                row_display.append(" * ")  # Modified belief
-        print("|" + "|".join(row_display) + "|")
-        print("-" * (size * 4 + 1))
+                print(f"  Agent {agent_id}: [*]")
 
 
-def print_grid_beliefs(grid: list[list[str]], size: int, title: str) -> None:
-    """Print full beliefs for all agents in grid."""
+def print_layout_beliefs(layout: Layout, title: str) -> None:
+    """Print full beliefs for all agents in layout."""
     print(f"\n{title}:")
-    for row in range(size):
-        for col in range(size):
-            agent_id = row * size + col
-            belief = grid[row][col]
-            print(f"  Agent {agent_id}: {belief}")
+    for agent_id in range(layout.get_agent_count()):
+        belief = layout.get_belief(agent_id)
+        pos_label = layout.get_position_label(agent_id)
+        print(f"  Agent {agent_id} {pos_label}: {belief}")
 
 
 def run_simulation():
@@ -204,10 +188,18 @@ def run_simulation():
     # Initialize logger
     logger = SimulationLogger()
     
+    # Initialize layout
+    # layout = Grid4Layout(GRID_SIZE)
+    # layout = Grid8Layout(GRID_SIZE)
+    layout = RingLayout(N_AGENTS)
+    # layout = MeshLayout(GRID_SIZE)
+    # layout = StarLayout(N_AGENTS)
+    
     print("=" * 60)
     print("AGENTIC BELIEF PROPAGATION SIMULATION")
     print("=" * 60)
-    print(f"Grid size: {GRID_SIZE}x{GRID_SIZE} ({GRID_SIZE**2} agents)")
+    print(f"Layout: {layout.__class__.__name__}")
+    print(f"Number of agents: {N_AGENTS}")
     print(f"Conversation rounds: {CONVERSATION_ROUNDS}")
     print(f"Simulation iterations: {SIMULATION_ITERATIONS}")
     print(f"Model: {MODEL}")
@@ -222,7 +214,7 @@ def run_simulation():
         print("Random seed: None (non-reproducible)")
     
     # Log config
-    logger.log_config(GRID_SIZE, CONVERSATION_ROUNDS, SIMULATION_ITERATIONS, MODEL, RANDOM_SEED)
+    logger.log_config(N_AGENTS, CONVERSATION_ROUNDS, SIMULATION_ITERATIONS, MODEL, RANDOM_SEED)
     
     # Load beliefs
     beliefs = load_beliefs(BELIEFS_FILE)
@@ -237,13 +229,13 @@ def run_simulation():
     example_defender_prompt = build_system_prompt("...", "defender")
     logger.log_system_prompts(example_persuader_prompt, example_defender_prompt)
     
-    # Initialize grid (seed already set above if RANDOM_SEED is not None)
-    grid = initialize_grid(beliefs, GRID_SIZE)
+    # Initialize layout with beliefs (seed already set above if RANDOM_SEED is not None)
+    layout.initialize(beliefs)
     
-    # Print and log starting grid (FULL beliefs)
-    print_grid_beliefs(grid, GRID_SIZE, "Starting Grid Beliefs")
-    print_grid(grid, beliefs, GRID_SIZE)
-    logger.log_starting_grid(grid, GRID_SIZE)
+    # Print and log starting beliefs
+    print_layout_beliefs(layout, "Starting Grid Beliefs")
+    print_layout_grid(layout, beliefs)
+    logger.log_starting_grid_from_layout(layout)
     
     # Track changes
     belief_changes = 0
@@ -255,27 +247,22 @@ def run_simulation():
         print("=" * 60)
         
         # Pick random agent
-        agent_row = random.randint(0, GRID_SIZE - 1)
-        agent_col = random.randint(0, GRID_SIZE - 1)
-        agent_id = pos_to_id(agent_row, agent_col, GRID_SIZE)
+        agent_id = random.randint(0, layout.get_agent_count() - 1)
         
-        # Pick random neighbor
-        neighbors = get_neighbors(agent_row, agent_col, GRID_SIZE)
-        neighbor_row, neighbor_col = random.choice(neighbors)
-        neighbor_id = pos_to_id(neighbor_row, neighbor_col, GRID_SIZE)
+        # Pick random neighbor using layout
+        neighbors = layout.get_neighbors(agent_id)
+        neighbor_id = random.choice(neighbors)
         
         # 50/50 who is persuader vs defender
         if random.random() < 0.5:
-            persuader_pos = (agent_row, agent_col)
-            defender_pos = (neighbor_row, neighbor_col)
             persuader_id, defender_id = agent_id, neighbor_id
         else:
-            persuader_pos = (neighbor_row, neighbor_col)
-            defender_pos = (agent_row, agent_col)
             persuader_id, defender_id = neighbor_id, agent_id
         
-        persuader_belief = grid[persuader_pos[0]][persuader_pos[1]]
-        defender_belief = grid[defender_pos[0]][defender_pos[1]]
+        persuader_belief = layout.get_belief(persuader_id)
+        defender_belief = layout.get_belief(defender_id)
+        persuader_pos = layout.get_position_label(persuader_id)
+        defender_pos = layout.get_position_label(defender_id)
         
         print(f"\nAgent {persuader_id} (persuader) @ {persuader_pos}")
         print(f"  Belief: {persuader_belief[:50]}...")
@@ -328,8 +315,8 @@ def run_simulation():
         # Log decision
         logger.log_decision(defender_belief, new_belief, change_type)
         
-        # Update grid
-        grid[defender_pos[0]][defender_pos[1]] = new_belief
+        # Update belief in layout
+        layout.set_belief(defender_id, new_belief)
         
         if change_type == "changed":
             belief_changes += 1
@@ -339,7 +326,7 @@ def run_simulation():
         else:
             print(">>> Belief unchanged")
         
-        print_grid(grid, beliefs, GRID_SIZE)
+        print_layout_grid(layout, beliefs)
     
     # Final summary
     print("\n" + "=" * 60)
@@ -349,11 +336,11 @@ def run_simulation():
     print(f"Belief changes detected: {belief_changes}")
     
     # Print full final beliefs
-    print_grid_beliefs(grid, GRID_SIZE, "Final Grid Beliefs")
-    print_grid(grid, beliefs, GRID_SIZE)
+    print_layout_beliefs(layout, "Final Grid Beliefs")
+    print_layout_grid(layout, beliefs)
     
     # Log final state
-    logger.log_final_grid(grid, GRID_SIZE)
+    logger.log_final_grid_from_layout(layout)
     logger.log_summary(SIMULATION_ITERATIONS, belief_changes)
     logger.close()
     
