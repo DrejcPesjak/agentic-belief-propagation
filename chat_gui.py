@@ -62,7 +62,7 @@ class ConversationGUI:
         self.root = tk.Tk()
         self.root.title(f"Belief Propagation - Iteration {self.iteration}/{self.total_iterations}")
         self.root.configure(bg=self.COLORS["bg_dark"])
-        self.root.geometry("1400x800")
+        self.root.geometry("1400x800+540+0")
         self.root.minsize(1000, 600)
         
         # Configure grid weights
@@ -228,10 +228,21 @@ class ConversationGUI:
         self.chat_canvas.pack(side="left", fill="both", expand=True, padx=(20, 0), pady=10)
         scrollbar.pack(side="right", fill="y", pady=10, padx=(0, 5))
         
-        # Bind mouse wheel to this canvas only
-        self.chat_canvas.bind("<MouseWheel>", self._on_mousewheel)
-        self.chat_canvas.bind("<Button-4>", self._on_mousewheel)
-        self.chat_canvas.bind("<Button-5>", self._on_mousewheel)
+        # Bind mouse wheel - use bind_all for the scrollable area
+        self._bind_mousewheel(self.chat_canvas)
+        self._bind_mousewheel(self.scrollable_frame)
+    
+    def _bind_mousewheel(self, widget):
+        """Bind mouse wheel events to a widget and all its children."""
+        widget.bind("<MouseWheel>", self._on_mousewheel)
+        widget.bind("<Button-4>", self._on_mousewheel)
+        widget.bind("<Button-5>", self._on_mousewheel)
+    
+    def _bind_mousewheel_recursive(self, widget):
+        """Recursively bind mousewheel to widget and all descendants."""
+        self._bind_mousewheel(widget)
+        for child in widget.winfo_children():
+            self._bind_mousewheel_recursive(child)
         
     def _on_canvas_configure(self, event):
         """Handle canvas resize."""
@@ -343,6 +354,9 @@ class ConversationGUI:
         else:
             round_label.pack(anchor="e", pady=(0, 3))
             bubble.pack(anchor="e")
+        
+        # Bind mousewheel to new widgets
+        self._bind_mousewheel_recursive(msg_container)
         
         # Scroll to bottom
         self.chat_canvas.update_idletasks()

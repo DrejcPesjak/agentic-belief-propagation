@@ -30,15 +30,15 @@ def parse_log_file(log_path: str) -> dict:
         iteration_num = int(match.group(1))
         iteration_text = match.group(0)
         
-        # Extract persuader info
+        # Extract persuader info (flexible position format: "(0, 2)" or "[mesh node 5]" etc.)
         persuader_match = re.search(
-            r"PERSUADER: Agent (\d+) @ \((\d+), (\d+)\)\nBelief: (.+?)(?=\n\nDEFENDER:)",
+            r"PERSUADER: Agent (\d+) @ .+?\nBelief: (.+?)(?=\n\nDEFENDER:)",
             iteration_text, re.DOTALL
         )
         
         # Extract defender info
         defender_match = re.search(
-            r"DEFENDER: Agent (\d+) @ \((\d+), (\d+)\)\nBelief: (.+?)(?=\n\n-{40})",
+            r"DEFENDER: Agent (\d+) @ .+?\nBelief: (.+?)(?=\n\n-{40})",
             iteration_text, re.DOTALL
         )
         
@@ -46,10 +46,10 @@ def parse_log_file(log_path: str) -> dict:
             continue
             
         persuader_id = int(persuader_match.group(1))
-        persuader_belief = persuader_match.group(4).strip()
+        persuader_belief = persuader_match.group(2).strip()
         
         defender_id = int(defender_match.group(1))
-        defender_belief = defender_match.group(4).strip()
+        defender_belief = defender_match.group(2).strip()
         
         # Extract messages
         messages = []

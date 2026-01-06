@@ -4,6 +4,7 @@ Uses Ollama with Gemma3 for LLM-based belief dissemination on a 2D grid.
 """
 
 import json
+import math
 import random
 from typing import Optional, Callable
 import ollama
@@ -15,14 +16,32 @@ from network_gui import NetworkVisualizer
 
 
 # === Configuration ===
-# GRID_SIZE = 3  # 3x3 grid = 9 agents
-N_AGENTS = 9
+N_AGENTS = 15
 CONVERSATION_ROUNDS = 5  # 5 exchanges per interaction
-SIMULATION_ITERATIONS = 5  # total interactions to simulate
+SIMULATION_ITERATIONS = 40  # total interactions to simulate
 MODEL = "gemma3"
-BELIEFS_FILE = "money-philosophy.json"
+BELIEFS_FILE = "favorite-fruit.json"
 GUI_CLOSE_DELAY = 5.0  # seconds to show final decision before closing
 RANDOM_SEED = 42  # Seed for reproducible starting grid distribution (None for random)
+
+# === Network Layout ===
+# LAYOUT = Grid4Layout(int(math.sqrt(N_AGENTS)))
+# LAYOUT = Grid8Layout(int(math.sqrt(N_AGENTS)))
+# LAYOUT = RingLayout(N_AGENTS)
+# LAYOUT = MeshLayout(N_AGENTS)
+LAYOUT = StarLayout(N_AGENTS)
+
+# === Prompts ===
+# {belief} will be replaced with the agent's actual belief
+PERSUADER_INIT_PROMPT = "Start the conversation by presenting your belief and why the other person should adopt it."
+PERSUADER_SYSTEM_PROMPT = 'This is your belief: "{belief}". You are the persuader. Try to convince the other person of your belief. Be concise.'
+# 'This is your belief: "{belief}". You are the aggressive persuader. At any price try to convince the other person of your belief. Be concise.'
+DEFENDER_SYSTEM_PROMPT = 'This is your belief: "{belief}". You are the defender. Listen to the other person and critically analyze their arguments based on your belief. Be concise.'
+DEFENDER_FINAL_PROMPT = (
+    "Based on this conversation, decide if you want to update your belief or keep it. "
+    "Output ONLY your final belief as a single statement starting with 'I'. Nothing else."
+    "Keep it short and core."
+)
 
 
 def load_beliefs(filepath: str) -> list[str]:
@@ -30,15 +49,6 @@ def load_beliefs(filepath: str) -> list[str]:
     with open(filepath, "r") as f:
         data = json.load(f)
     return data["beliefs"]
-
-
-def build_system_prompt(belief: str, role: str) -> str:
-    """Build simple system prompt for an agent."""
-    if role == "persuader":
-        return f'This is your belief: "{belief}". You are the persuader. Try to convince the other person of your belief. Be concise.'
-        # return f'This is your belief: "{belief}". You are the aggressive persuader. At any price try to convince the other person of your belief. Be concise.'
-    else:  # defender
-        return f'This is your belief: "{belief}". You are the defender. Listen to the other person and critically analyze their arguments based on your belief. Be concise.'
 
 
 def create_conversation_runner(
@@ -56,8 +66,8 @@ def create_conversation_runner(
         """
         Run a conversation between persuader and defender.
         """
-        persuader_system = build_system_prompt(persuader_belief, "persuader")
-        defender_system = build_system_prompt(defender_belief, "defender")
+        persuader_system = PERSUADER_SYSTEM_PROMPT.format(belief=persuader_belief)
+        defender_system = DEFENDER_SYSTEM_PROMPT.format(belief=defender_belief)
         
         conversation_history = []
         
@@ -68,7 +78,7 @@ def create_conversation_runner(
         # Initial persuader message
         persuader_messages.append({
             "role": "user", 
-            "content": "Start the conversation by presenting your belief and why the other person should adopt it."
+            "content": PERSUADER_INIT_PROMPT
         })
         
         for round_num in range(rounds):
@@ -125,11 +135,7 @@ def create_conversation_runner(
         # Final decision from defender
         defender_messages.append({
             "role": "user",
-            "content": (
-                "Based on this conversation, decide if you want to update your belief or keep it. "
-                "Output ONLY your final belief as a single statement starting with 'I'. Nothing else."
-                "Keep it short and core."
-            )
+            "content": DEFENDER_FINAL_PROMPT
         })
         
         final_response = ollama.chat(
@@ -189,12 +195,8 @@ def run_simulation():
     # Initialize logger
     logger = SimulationLogger()
     
-    # Initialize layout
-    # layout = Grid4Layout(GRID_SIZE)
-    # layout = Grid8Layout(GRID_SIZE)
-    layout = RingLayout(N_AGENTS)
-    # layout = MeshLayout(GRID_SIZE)
-    # layout = StarLayout(N_AGENTS)
+    # Use global layout
+    layout = LAYOUT
     
     print("=" * 60)
     print("AGENTIC BELIEF PROPAGATION SIMULATION")
@@ -225,10 +227,8 @@ def run_simulation():
     
     logger.log_beliefs(beliefs)
     
-    # Log system prompts (using example beliefs)
-    example_persuader_prompt = build_system_prompt("...", "persuader")
-    example_defender_prompt = build_system_prompt("...", "defender")
-    logger.log_system_prompts(example_persuader_prompt, example_defender_prompt)
+    # Log system prompts
+    logger.log_system_prompts(PERSUADER_SYSTEM_PROMPT, DEFENDER_SYSTEM_PROMPT)
     
     # Initialize layout with beliefs (seed already set above if RANDOM_SEED is not None)
     layout.initialize(beliefs)

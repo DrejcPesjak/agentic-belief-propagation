@@ -64,6 +64,13 @@ class NetworkVisualizer:
         self.canvas_height = 500
         self.padding = 60
         
+        # Window dimensions (including padding/chrome)
+        self.window_width = self.canvas_width + 40
+        self.window_height = self.canvas_height + 150
+        
+        # Position at top-left corner
+        self.root.geometry(f"{self.window_width}x{self.window_height}+0+0")
+        
         # Create canvas
         self.canvas = tk.Canvas(
             self.root,
